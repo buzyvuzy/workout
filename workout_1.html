@@ -663,7 +663,6 @@
   // ── SET COUNTER ──
   function addSet(e, btn) {
     e.stopPropagation();
-    initAudio(); // unlock AudioContext on this user gesture
     const maxSets = parseInt(btn.dataset.sets);
     let done = parseInt(btn.dataset.done);
     if (done >= maxSets) return;
@@ -741,21 +740,10 @@
     updateTimerDisplay();
   }
 
-  // ── AUDIO ──
-  let audioCtx = null;
-
-  function initAudio() {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    // iOS suspends context — resume on every user tap
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
-  }
-
+  // ── AUDIO — iOS Safari requires fresh context created synchronously on tap ──
   function playBell(freq, duration, volume) {
     try {
-      const ctx = initAudio();
+      const ctx  = new (window.AudioContext || window.webkitAudioContext)();
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
@@ -763,18 +751,20 @@
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(freq * 0.75, ctx.currentTime + duration);
-      gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.01);
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration);
-    } catch(e) { console.log('audio error', e); }
+      // close context after sound finishes to free memory
+      osc.onended = () => ctx.close();
+    } catch(e) { console.warn('audio:', e); }
   }
 
-  function playTick() { playBell(440, 0.35, 0.3); }
+  function playTick() { playBell(440, 0.35, 0.28); }
   function playDone()  {
-    playBell(523, 0.5, 0.35);
-    setTimeout(() => playBell(659, 0.7, 0.35), 280);
+    playBell(523, 0.5, 0.32);
+    setTimeout(() => playBell(659, 0.7, 0.32), 280);
   }
 
   // ── NEXT EXERCISE TOAST WITH TIMER ──
@@ -846,13 +836,11 @@
   }
 
   function closeToast() {
-    initAudio();
     clearInterval(toastInterval);
     document.getElementById('next-toast').classList.remove('show');
   }
 
   function toastAddTime() {
-    initAudio();
     toastRemaining += 30;
     updateToastTimer();
   }
