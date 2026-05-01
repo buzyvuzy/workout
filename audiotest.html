@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio Test</title>
+<style>
+  body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; background: #f5f4f2; }
+  button { padding: 20px 40px; font-size: 18px; border-radius: 16px; border: none; background: #FF4D6D; color: white; font-weight: 700; cursor: pointer; }
+  #log { font-size: 14px; color: #555; text-align: center; max-width: 300px; }
+</style>
+</head>
+<body>
+<div id="log">Нажми кнопку — должен быть звук</div>
+<button onclick="test()">🔊 Тест звука</button>
+<script>
+  function test() {
+    const log = document.getElementById('log');
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      log.textContent = 'AudioContext создан. Состояние: ' + ctx.state;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 520;
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.8);
+      osc.onended = () => {
+        log.textContent = '✅ Звук сыгран! Если не слышала — проверь громкость и режим без звука';
+        ctx.close();
+      };
+    } catch(e) {
+      document.getElementById('log').textContent = '❌ Ошибка: ' + e.message;
+    }
+  }
+</script>
+</body>
+</html>
