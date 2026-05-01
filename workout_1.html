@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GlowUp</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f2;
+    --white: #ffffff;
+    --accent: #FF4D6D;
+    --accent2: #FF8C42;
+    --accent3: #6C63FF;
+    --green: #2EC4B6;
+    --text: #1a1a2e;
+    --text2: #555;
+    --muted: #999;
+    --border: #ece9e4;
+    --safe-top: env(safe-area-inset-top, 20px);
+    --safe-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text); font-family:'Plus Jakarta Sans',sans-serif; min-height:100vh; overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+
+  .app-header {
+    position:sticky; top:0; z-index:100;
+    background:rgba(245,244,242,0.93);
+    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+    padding:calc(var(--safe-top) + 8px) 20px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .greeting { font-size:12px; color:var(--muted); font-weight:500; }
+  .title { font-size:22px; font-weight:800; color:var(--text); letter-spacing:-0.5px; line-height:1.2; }
+  .title span { color:var(--accent); }
+  .avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:0 4px 14px rgba(255,77,109,0.3); }
+
+  .tab-wrap { padding:0 16px 14px; }
+  .tab-bar { display:grid; grid-template-columns:1fr 1fr; background:var(--white); border-radius:16px; padding:4px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .tab-btn { padding:10px; border-radius:12px; border:none; background:transparent; color:var(--muted); font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.25s; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .tab-btn.active { background:var(--accent); color:white; box-shadow:0 4px 12px rgba(255,77,109,0.35); }
+
+  .workout-panel { display:none; padding:0 16px 110px; }
+  .workout-panel.active { display:block; }
+
+  /* ── STICKY MINI PROGRESS BAR (always visible when scrolled) ── */
+  .sticky-progress {
+    position:sticky;
+    top:var(--header-h, 0px);   /* pushed down by JS to sit below header+tabs */
+    z-index:90;
+    margin-left:-16px;
+    margin-right:-16px;
+    padding:10px 16px 0;
+    background:rgba(245,244,242,0.96);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+
+  /* ── HERO CARD (full size at top, collapses on scroll) ── */
+  .hero-card {
+    background:linear-gradient(135deg,#1a1a2e 0%,#2d2b55 100%);
+    border-radius:24px; padding:20px; margin-bottom:14px;
+    position:relative; overflow:hidden;
+    transition: border-radius 0.3s, padding 0.3s, margin 0.3s;
+  }
+  /* collapsed state */
+  .hero-card.collapsed {
+    border-radius:0 0 20px 20px;
+    padding:12px 20px 14px;
+    margin-bottom:14px;
+    margin-left:-16px;
+    margin-right:-16px;
+  }
+  .hero-card::before { content:''; position:absolute; right:-20px; top:-20px; width:120px; height:120px; border-radius:50%; background:rgba(255,77,109,0.15); }
+  .hero-card::after  { content:''; position:absolute; right:20px; bottom:-30px; width:80px; height:80px; border-radius:50%; background:rgba(108,99,255,0.2); }
+
+  .hero-label { font-size:11px; color:rgba(255,255,255,0.5); font-weight:600; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; transition:all 0.3s; }
+  .hero-card.collapsed .hero-label { font-size:10px; margin-bottom:4px; }
+
+  .hero-row { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:14px; position:relative; z-index:1; transition:margin 0.3s; }
+  .hero-card.collapsed .hero-row { margin-bottom:8px; }
+
+  .hero-count { font-size:48px; font-weight:800; color:white; letter-spacing:-1px; line-height:1; transition:font-size 0.3s; }
+  .hero-card.collapsed .hero-count { font-size:28px; }
+
+  .hero-of { font-size:17px; color:rgba(255,255,255,0.55); font-weight:600; margin-bottom:6px; transition:font-size 0.3s; }
+  .hero-card.collapsed .hero-of { font-size:13px; margin-bottom:3px; }
+
+  .hero-bar-bg { height:10px; background:rgba(255,255,255,0.12); border-radius:5px; overflow:hidden; position:relative; z-index:1; transition:height 0.3s; }
+  .hero-card.collapsed .hero-bar-bg { height:7px; }
+  .hero-bar-fill { height:100%; border-radius:5px; background:linear-gradient(90deg,#2EC4B6,#44e08a); transition:width 0.5s cubic-bezier(.4,0,.2,1); box-shadow:0 0 14px rgba(46,196,182,0.6); }
+
+  /* ── DONE STATE — green ── */
+  .ex-card.done { border-color:rgba(46,196,182,0.35); background:rgba(46,196,182,0.05); }
+  .ex-card.done .done-btn { background:#2EC4B6; border-color:#2EC4B6; }
+
+  .muscle-row { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+  .muscle-row::-webkit-scrollbar { display:none; }
+  .muscle-chip { flex-shrink:0; background:var(--white); border-radius:50px; padding:8px 14px; display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .mdot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .mname { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; }
+  .mpct  { font-size:12px; color:var(--muted); font-weight:500; }
+
+  .section { margin-bottom:6px; animation:fadeUp 0.35s ease both; }
+  .section:nth-child(4){animation-delay:.05s}.section:nth-child(5){animation-delay:.1s}.section:nth-child(6){animation-delay:.15s}.section:nth-child(7){animation-delay:.2s}.section:nth-child(8){animation-delay:.25s}
+
+  .sh { display:flex; align-items:center; gap:10px; padding:8px 4px 10px; }
+  .snum { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0; }
+  .nr { background:rgba(255,77,109,0.12); color:var(--accent); }
+  .nb { background:rgba(108,99,255,0.12); color:var(--accent3); }
+  .ng { background:rgba(46,196,182,0.12); color:var(--green); }
+  .no { background:rgba(255,140,66,0.12); color:var(--accent2); }
+  .stitle { font-size:15px; font-weight:800; color:var(--text); letter-spacing:-0.3px; }
+  .ssub   { font-size:12px; color:var(--muted); font-weight:500; margin-top:1px; }
+  .sbadge { margin-left:auto; background:var(--bg); border-radius:50px; padding:4px 10px; font-size:12px; font-weight:700; color:var(--text2); }
+
+  .ex-card { background:var(--white); border-radius:18px; padding:14px 16px; margin-bottom:8px; border:1.5px solid transparent; transition:all 0.2s; cursor:pointer; }
+  .ex-card:active { transform:scale(0.98); }
+  .ex-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .ex-left { flex:1; min-width:0; }
+  .exname  { font-size:15px; font-weight:700; color:var(--text); line-height:1.3; }
+  .exnameru{ font-size:13px; color:#666; margin-top:3px; font-weight:500; }
+  .ex-tags { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+  .tag { display:inline-flex; align-items:center; gap:4px; border-radius:7px; padding:4px 10px; font-size:12px; font-weight:600; }
+  .tm { background:rgba(108,99,255,0.08); color:var(--accent3); }
+  .tf { background:rgba(255,140,66,0.10); color:var(--accent2); }
+  .tb { background:rgba(46,196,182,0.10); color:var(--green); }
+
+  .sets-box { display:flex; flex-direction:column; align-items:center; gap:5px; flex-shrink:0; }
+  .sets-pill { background:var(--bg); border-radius:12px; padding:8px 12px; text-align:center; min-width:64px; }
+  .sets-main { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.5px; line-height:1; }
+  .sets-main span { font-size:12px; color:var(--muted); font-weight:500; }
+  .sets-reps { font-size:13px; color:var(--text2); font-weight:600; margin-top:2px; }
+  .per-leg { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px; }
+
+  .done-btn { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; transition:all 0.2s; background:white; flex-shrink:0; }
+  .done-btn svg { opacity:0; transition:opacity 0.2s; }
+  .ex-card.done .done-btn svg { opacity:1; }
+
+  .ex-tip { margin-top:10px; padding:9px 12px; background:var(--bg); border-radius:10px; font-size:13px; color:var(--text2); line-height:1.5; display:flex; gap:6px; }
+  .key-tip { display:flex; gap:8px; align-items:flex-start; background:rgba(255,77,109,0.06); border-left:3px solid var(--accent); border-radius:0 12px 12px 0; padding:10px 12px; margin-bottom:8px; font-size:13px; color:#c0374f; font-weight:600; line-height:1.5; }
+
+  .bottom-nav { position:fixed; bottom:0; left:0; right:0; background:rgba(255,255,255,0.95); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); display:flex; padding:8px 0 calc(var(--safe-bottom) + 2px); }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; opacity:0.35; transition:opacity 0.2s; }
+  .nav-item.active { opacity:1; }
+  .nav-icon { font-size:22px; line-height:1; }
+  .nav-label { font-size:10px; color:var(--muted); font-weight:600; }
+  .nav-item.active .nav-label { color:var(--accent); }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .hero-card { animation:fadeUp 0.3s ease both; }
+  .muscle-row { animation:fadeUp 0.3s ease 0.05s both; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div>
+    <div class="greeting">Привет 👋</div>
+    <div class="title">Твоя <span>тренировка</span></div>
+  </div>
+  <div class="avatar">🍑</div>
+</div>
+
+<div class="tab-wrap">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab(0,this)">🍑 Тренировка 1</button>
+    <button class="tab-btn" onclick="switchTab(1,this)">🦵 Тренировка 2</button>
+  </div>
+</div>
+
+<!-- WORKOUT 1 -->
+<div class="workout-panel active" id="panel-0">
+  <div class="sticky-progress">
+  <div class="hero-card" id="hero-1">
+    <div class="hero-label">Прогресс тренировки</div>
+    <div class="hero-row">
+      <div class="hero-count" id="d1">0</div>
+      <div class="hero-of" id="t1">из 10 упражнений</div>
+    </div>
+    <div class="hero-bar-bg"><div class="hero-bar-fill" id="b1" style="width:0%"></div></div>
+  </div>
+  </div>
+  <div class="muscle-row">
+    <div class="muscle-chip"><div class="mdot" style="background:#FF4D6D"></div><span class="mname">Ягодицы</span><span class="mpct">95%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#FF8C42"></div><span class="mname">Квадрицепс</span><span class="mpct">75%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#6C63FF"></div><span class="mname">Спина</span><span class="mpct">55%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#2EC4B6"></div><span class="mname">Руки</span><span class="mpct">40%</span></div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum nr">1</div><div><div class="stitle">Активация ягодиц</div><div class="ssub">Обязательно перед базой</div></div><div class="sbadge">2 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">2 <span>×</span></div><div class="sets-reps">15–20</div></div><div class="per-leg">на ногу</div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+      <div class="ex-tip">💡 Лёгкий вес, медленно. Цель — "включить" ягодицу</div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение ноги в сторону</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">2 <span>×</span></div><div class="sets-reps">15–20</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+      <div class="ex-tip">💡 Почувствуй боковую часть ягодицы</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum nb">2</div><div><div class="stitle">Главная база</div><div class="ssub">Максимальный рост</div></div><div class="sbadge">3 упр.</div></div>
+    <div class="key-tip">🔥 Главный блок — работай тяжело, полная амплитуда!</div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Barbell Squat</div><div class="exnameru">Присед в Смите</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">4 <span>×</span></div><div class="sets-reps">8–10</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Hip Thrust</div><div class="exnameru">Ягодичный мост в Смите</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">4 <span>×</span></div><div class="sets-reps">8–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+      <div class="ex-tip">⭐ <strong>Главное упражнение для роста ягодиц</strong></div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Leg Press</div><div class="exnameru">Жим ногами</div><div class="ex-tags"><span class="tag tm">📌 Leg Press Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">10–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum ng">3</div><div><div class="stitle">Руки</div><div class="ssub">Спина, плечи, бицепс</div></div><div class="sbadge">3 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Lat Pulldown</div><div class="exnameru">Тяга верхнего блока</div><div class="ex-tags"><span class="tag tm">📌 Lat Pulldown Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">10–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Lateral Raise</div><div class="exnameru">Разводка гантелей в стороны</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">12–15</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Biceps Curl</div><div class="exnameru">Подъём гантелей на бицепс</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">10–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum no">4</div><div><div class="stitle">Финальная добивка</div><div class="ssub">Дожигаем ягодицы</div></div><div class="sbadge">1 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-0')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение в сторону — финиш</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">2 <span>×</span></div><div class="sets-reps">20</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+      <div class="ex-tip">🔥 Лёгкий вес — цель: сильное жжение в ягодицах</div>
+    </div>
+  </div>
+</div>
+
+<!-- WORKOUT 2 -->
+<div class="workout-panel" id="panel-1">
+  <div class="sticky-progress">
+  <div class="hero-card" id="hero-2">
+    <div class="hero-label">Прогресс тренировки</div>
+    <div class="hero-row">
+      <div class="hero-count" id="d2">0</div>
+      <div class="hero-of" id="t2">из 10 упражнений</div>
+    </div>
+    <div class="hero-bar-bg"><div class="hero-bar-fill" id="b2" style="width:0%"></div></div>
+  </div>
+  </div>
+  <div class="muscle-row">
+    <div class="muscle-chip"><div class="mdot" style="background:#FF4D6D"></div><span class="mname">Ягодицы</span><span class="mpct">90%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#f368e0"></div><span class="mname">Бицепс бедра</span><span class="mpct">80%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#fdcb6e"></div><span class="mname">Плечи</span><span class="mpct">50%</span></div>
+    <div class="muscle-chip"><div class="mdot" style="background:#a29bfe"></div><span class="mname">Трицепс</span><span class="mpct">35%</span></div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum nr">1</div><div><div class="stitle">Активация</div><div class="ssub">Разбудить ягодицы</div></div><div class="sbadge">1 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">2 <span>×</span></div><div class="sets-reps">15–20</div></div><div class="per-leg">на ногу</div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum nb">2</div><div><div class="stitle">Главная сила</div><div class="ssub">Задняя цепь</div></div><div class="sbadge">2 упр.</div></div>
+    <div class="key-tip">💡 Румынская тяга — ключевое для задней поверхности и формы снизу</div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Romanian Deadlift</div><div class="exnameru">Румынская тяга</div><div class="ex-tags"><span class="tag tf">🏋️ Barbell / Dumbbells</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">4 <span>×</span></div><div class="sets-reps">8–10</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Bulgarian Split Squat</div><div class="exnameru">Болгарские выпады</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">8–10</div></div><div class="per-leg">на ногу</div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum nr">3</div><div><div class="stitle">Форма ягодиц</div><div class="ssub">Объём и округлость</div></div><div class="sbadge">2 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение в сторону</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">12–15</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">12–15</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum ng">4</div><div><div class="stitle">Руки</div><div class="ssub">Спина, плечи, трицепс</div></div><div class="sbadge">3 упр.</div></div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Seated Row</div><div class="exnameru">Горизонтальная тяга</div><div class="ex-tags"><span class="tag tm">📌 Seated Row Machine</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">10–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Shoulder Press</div><div class="exnameru">Жим гантелей вверх</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">8–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Triceps Extension</div><div class="exnameru">Разгибание на трицепс</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">3 <span>×</span></div><div class="sets-reps">10–12</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sh"><div class="snum no">5</div><div><div class="stitle">Финал — важно!</div><div class="ssub">Не пропускай</div></div><div class="sbadge">1 упр.</div></div>
+    <div class="key-tip">⚡ Финальный мост без веса — максимально "дожигает" мышцы!</div>
+    <div class="ex-card" onclick="toggleDone(this,'panel-1')">
+      <div class="ex-top">
+        <div class="ex-left"><div class="exname">Glute Bridge</div><div class="exnameru">Ягодичный мост на полу</div><div class="ex-tags"><span class="tag tb">🤸 Bodyweight</span></div></div>
+        <div class="sets-box"><div class="sets-pill"><div class="sets-main">2 <span>×</span></div><div class="sets-reps">20–25</div></div><div class="done-btn"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+      </div>
+      <div class="ex-tip">🔥 Без веса, чувствуй каждое повторение</div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item active"><div class="nav-icon">🏋️</div><div class="nav-label">Тренировка</div></div>
+  <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Прогресс</div></div>
+  <div class="nav-item"><div class="nav-icon">💧</div><div class="nav-label">Питание</div></div>
+  <div class="nav-item"><div class="nav-icon">👤</div><div class="nav-label">Профиль</div></div>
+</div>
+
+<script>
+  // ── Measure sticky header height so progress card sits right below it ──
+  function setHeaderHeight() {
+    const header = document.querySelector('.app-header');
+    const tabs   = document.querySelector('.tab-wrap');
+    const h = (header ? header.offsetHeight : 0) + (tabs ? tabs.offsetHeight : 0);
+    document.documentElement.style.setProperty('--header-h', h + 'px');
+  }
+  setHeaderHeight();
+  window.addEventListener('resize', setHeaderHeight);
+
+  // ── Collapse hero card on scroll ──
+  const COLLAPSE_THRESHOLD = 80;
+
+  function updateCollapse() {
+    const scrollY = window.scrollY;
+    ['hero-1','hero-2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        if (scrollY > COLLAPSE_THRESHOLD) {
+          el.classList.add('collapsed');
+        } else {
+          el.classList.remove('collapsed');
+        }
+      }
+    });
+  }
+
+  window.addEventListener('scroll', updateCollapse, { passive: true });
+
+  function switchTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.workout-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + idx).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleDone(card, panelId) {
+    card.classList.toggle('done');
+    updateProgress(panelId);
+  }
+
+  function updateProgress(panelId) {
+    const panel = document.getElementById(panelId);
+    const done = panel.querySelectorAll('.ex-card.done').length;
+    const total = panel.querySelectorAll('.ex-card').length;
+    const n = panelId === 'panel-0' ? '1' : '2';
+    document.getElementById('d' + n).textContent = done;
+    document.getElementById('t' + n).textContent = 'из ' + total + ' упражнений';
+    document.getElementById('b' + n).style.width = Math.round(done/total*100) + '%';
+  }
+</script>
+</body>
+</html>
