@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GlowUp</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f2;
+    --white: #ffffff;
+    --accent: #FF4D6D;
+    --accent2: #FF8C42;
+    --accent3: #6C63FF;
+    --green: #2EC4B6;
+    --text: #1a1a2e;
+    --text2: #555;
+    --muted: #999;
+    --border: #ece9e4;
+    --safe-top: env(safe-area-inset-top, 20px);
+    --safe-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Plus Jakarta Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP SHELL — stays at top, never scrolls ── */
+  .top-shell {
+    flex-shrink: 0;
+    background: var(--bg);
+    z-index: 200;
+  }
+
+  .app-header {
+    padding: 12px 20px 10px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .greeting { font-size:12px; color:var(--muted); font-weight:500; }
+  .title { font-size:22px; font-weight:800; color:var(--text); letter-spacing:-0.5px; line-height:1.2; }
+  .title span { color:var(--accent); }
+  .avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:20px; box-shadow:0 4px 14px rgba(255,77,109,0.3); }
+
+  .tab-wrap { padding:0 16px 12px; }
+  .tab-bar { display:grid; grid-template-columns:1fr 1fr; background:var(--white); border-radius:16px; padding:4px; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+  .tab-btn { padding:10px; border-radius:12px; border:none; background:transparent; color:var(--muted); font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.25s; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .tab-btn.active { background:var(--accent); color:white; box-shadow:0 4px 12px rgba(255,77,109,0.35); }
+
+  /* PROGRESS HERO — two sizes via class */
+  .hero-wrap { padding:0 16px 12px; transition:padding 0.3s; }
+
+  .hero-card {
+    background:linear-gradient(135deg,#1a1a2e 0%,#2d2b55 100%);
+    border-radius:20px; padding:20px;
+    position:relative; overflow:hidden;
+    transition:padding 0.3s, border-radius 0.3s;
+  }
+  .hero-card.small { padding:12px 18px 14px; border-radius:14px; }
+
+  .hero-card::before { content:''; position:absolute; right:-20px; top:-20px; width:100px; height:100px; border-radius:50%; background:rgba(255,77,109,0.15); pointer-events:none; }
+  .hero-card::after  { content:''; position:absolute; right:16px; bottom:-24px; width:70px; height:70px; border-radius:50%; background:rgba(108,99,255,0.2); pointer-events:none; }
+
+  .hero-label { font-size:11px; color:rgba(255,255,255,0.5); font-weight:600; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; transition:font-size 0.3s; }
+  .hero-card.small .hero-label { font-size:10px; margin-bottom:3px; }
+
+  .hero-row { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:12px; position:relative; z-index:1; }
+  .hero-card.small .hero-row { margin-bottom:8px; }
+
+  .hero-count { font-size:48px; font-weight:800; color:white; letter-spacing:-2px; line-height:1; transition:font-size 0.3s; }
+  .hero-card.small .hero-count { font-size:28px; }
+
+  .hero-of { font-size:16px; color:rgba(255,255,255,0.55); font-weight:600; margin-bottom:5px; transition:font-size 0.3s; }
+  .hero-card.small .hero-of { font-size:13px; margin-bottom:3px; }
+
+  .hero-bar-bg { height:10px; background:rgba(255,255,255,0.12); border-radius:5px; overflow:hidden; position:relative; z-index:1; transition:height 0.3s; }
+  .hero-card.small .hero-bar-bg { height:7px; }
+  .hero-bar-fill { height:100%; border-radius:5px; background:linear-gradient(90deg,#2EC4B6,#44e08a); transition:width 0.5s cubic-bezier(.4,0,.2,1); box-shadow:0 0 12px rgba(46,196,182,0.5); }
+
+  /* ── SCROLLABLE CONTENT AREA ── */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* prevent overscroll bounce revealing gap */
+    overscroll-behavior: none;
+  }
+
+  .workout-panel { display:none; padding:0 16px 110px; }
+  .workout-panel.active { display:block; }
+
+  /* MUSCLE CHIPS */
+  .muscle-row { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; scrollbar-width:none; padding:12px 0 4px; }
+  .muscle-row::-webkit-scrollbar { display:none; }
+  .muscle-chip { flex-shrink:0; background:var(--white); border-radius:50px; padding:8px 14px; display:flex; align-items:center; gap:6px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .mdot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .mname { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; }
+  .mpct  { font-size:12px; color:var(--muted); font-weight:500; }
+
+  /* SECTIONS */
+  .section { margin-bottom:6px; animation:fadeUp 0.35s ease both; }
+  .section:nth-child(2){animation-delay:.05s}.section:nth-child(3){animation-delay:.1s}.section:nth-child(4){animation-delay:.15s}.section:nth-child(5){animation-delay:.2s}.section:nth-child(6){animation-delay:.25s}
+
+  .sh { display:flex; align-items:center; gap:10px; padding:8px 4px 10px; }
+  .snum { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; flex-shrink:0; }
+  .nr { background:rgba(255,77,109,0.12); color:var(--accent); }
+  .nb { background:rgba(108,99,255,0.12); color:var(--accent3); }
+  .ng { background:rgba(46,196,182,0.12); color:var(--green); }
+  .no { background:rgba(255,140,66,0.12); color:var(--accent2); }
+  .stitle { font-size:15px; font-weight:800; color:var(--text); letter-spacing:-0.3px; }
+  .ssub   { font-size:12px; color:var(--muted); font-weight:500; margin-top:1px; }
+  .sbadge { margin-left:auto; background:var(--bg); border-radius:50px; padding:4px 10px; font-size:12px; font-weight:700; color:var(--text2); }
+
+  /* EXERCISE CARDS */
+  .ex-card { background:var(--white); border-radius:18px; padding:14px 16px; margin-bottom:8px; border:1.5px solid transparent; transition:all 0.2s; cursor:pointer; }
+  .ex-card:active { transform:scale(0.98); }
+  .ex-card.done { border-color:rgba(46,196,182,0.35); background:rgba(46,196,182,0.05); }
+
+  .ex-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .ex-left { flex:1; min-width:0; }
+  .exname   { font-size:15px; font-weight:700; color:var(--text); line-height:1.3; }
+  .exnameru { font-size:13px; color:#666; margin-top:3px; font-weight:500; }
+  .ex-tags  { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+  .tag { display:inline-flex; align-items:center; gap:4px; border-radius:7px; padding:4px 10px; font-size:12px; font-weight:600; }
+  .tm { background:rgba(108,99,255,0.08); color:var(--accent3); }
+  .tf { background:rgba(255,140,66,0.10); color:var(--accent2); }
+  .tb { background:rgba(46,196,182,0.10); color:var(--green); }
+
+  .sets-box { display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; }
+
+  /* Set counter widget */
+  .set-counter { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .set-dots { display:flex; gap:5px; justify-content:center; }
+  .set-dot {
+    width:10px; height:10px; border-radius:50%;
+    background:var(--border);
+    transition:background 0.2s, transform 0.15s;
+  }
+  .set-dot.filled { background:#2EC4B6; }
+  .set-dot.filled:last-child { transform:scale(1.15); }
+
+  .set-tap-btn {
+    background:var(--bg); border:none; border-radius:12px;
+    padding:8px 12px; text-align:center; min-width:64px;
+    cursor:pointer; transition:background 0.15s, transform 0.1s;
+    font-family:'Plus Jakarta Sans',sans-serif;
+  }
+  .set-tap-btn:active { transform:scale(0.93); background:#e8e6e3; }
+  .set-tap-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.4px; line-height:1; margin-bottom:3px; }
+  .set-tap-nums { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.5px; line-height:1.2; display:flex; align-items:center; justify-content:center; gap:1px; }
+  .set-tap-nums .cur-sets,
+  .set-tap-nums .tot-sets { font-size:17px; font-weight:800; }
+  .set-tap-nums .cur-sets { color:var(--text); }
+  .set-tap-nums .sep      { font-size:15px; color:var(--muted); font-weight:500; margin:0 1px; }
+  .set-tap-nums .tot-sets { color:var(--muted); }
+  .set-tap-reps { font-size:13px; color:var(--text2); font-weight:600; }
+
+  .ex-card.done .set-tap-btn { background:rgba(46,196,182,0.12); }
+  .ex-card.done .set-tap-nums .cur-sets { color:#2EC4B6; }
+
+  /* ── REST TIMER OVERLAY ── */
+  .timer-overlay {
+    position:fixed; inset:0; z-index:500;
+    background:rgba(26,26,46,0.92);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    gap:10px;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.25s;
+  }
+  .timer-overlay.visible { opacity:1; pointer-events:all; }
+
+  .timer-label {
+    font-size:13px; font-weight:600; color:rgba(255,255,255,0.5);
+    text-transform:uppercase; letter-spacing:1.5px;
+  }
+  .timer-exercise {
+    font-size:15px; font-weight:700; color:rgba(255,255,255,0.75);
+    text-align:center; padding:0 32px;
+  }
+  .timer-circle {
+    position:relative; width:180px; height:180px; margin:8px 0;
+  }
+  .timer-circle svg { transform:rotate(-90deg); }
+  .timer-circle-bg { fill:none; stroke:rgba(255,255,255,0.08); stroke-width:8; }
+  .timer-circle-fill { fill:none; stroke:url(#timerGrad); stroke-width:8; stroke-linecap:round;
+    transition:stroke-dashoffset 1s linear; }
+  .timer-seconds {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .timer-num {
+    font-size:62px; font-weight:800; color:white; letter-spacing:-3px; line-height:1;
+  }
+  .timer-sec-label { font-size:13px; color:rgba(255,255,255,0.4); font-weight:600; margin-top:2px; }
+
+  .timer-skip {
+    margin-top:8px;
+    background:rgba(255,255,255,0.1); border:1.5px solid rgba(255,255,255,0.2);
+    color:white; border-radius:50px; padding:12px 32px;
+    font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; font-weight:700;
+    cursor:pointer; transition:background 0.15s;
+  }
+  .timer-skip:active { background:rgba(255,255,255,0.2); }
+  .timer-add { font-size:12px; color:rgba(255,255,255,0.4); font-weight:500; margin-top:4px; cursor:pointer; }
+  .timer-add:active { color:rgba(255,255,255,0.7); }
+
+  .per-leg { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px; }
+
+  .done-btn { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; transition:all 0.2s; background:white; flex-shrink:0; }
+  .ex-card.done .done-btn { background:#2EC4B6; border-color:#2EC4B6; }
+  .done-btn svg { opacity:0; transition:opacity 0.2s; }
+  .ex-card.done .done-btn svg { opacity:1; }
+
+  .ex-tip { margin-top:10px; padding:9px 12px; background:var(--bg); border-radius:10px; font-size:13px; color:var(--text2); line-height:1.5; }
+  .key-tip { display:flex; gap:8px; align-items:flex-start; background:rgba(255,77,109,0.06); border-left:3px solid var(--accent); border-radius:0 12px 12px 0; padding:10px 12px; margin-bottom:8px; font-size:13px; color:#c0374f; font-weight:600; line-height:1.5; }
+
+  /* BOTTOM NAV */
+  .bottom-nav { flex-shrink:0; background:rgba(255,255,255,0.96); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-top:1px solid var(--border); display:flex; padding:8px 0 calc(env(safe-area-inset-bottom, 0px) + 6px); z-index:300; }
+  .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; opacity:0.35; transition:opacity 0.2s; }
+  .nav-item.active { opacity:1; }
+  .nav-icon { font-size:22px; line-height:1; }
+  .nav-label { font-size:10px; color:var(--muted); font-weight:600; }
+  .nav-item.active .nav-label { color:var(--accent); }
+
+  /* ── NEXT EXERCISE TOAST ── */
+  .toast {
+    position:fixed; bottom:90px; left:16px; right:16px; z-index:400;
+    background:#1a1a2e;
+    border-radius:20px; padding:16px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.3);
+    transform:translateY(20px); opacity:0;
+    transition:transform 0.35s cubic-bezier(.34,1.56,.64,1), opacity 0.3s;
+    pointer-events:none;
+  }
+  .toast.show { transform:translateY(0); opacity:1; pointer-events:all; }
+
+  .toast-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .toast-left { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .toast-check { width:22px; height:22px; border-radius:50%; flex-shrink:0; background:rgba(46,196,182,0.25); display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .toast-done-name { font-size:12px; font-weight:600; color:rgba(255,255,255,0.4); }
+  .toast-done-ru   { display:none; }
+  .toast-close { width:28px; height:28px; border-radius:50%; flex-shrink:0; background:rgba(255,255,255,0.1); border:none; color:rgba(255,255,255,0.6); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; line-height:1; }
+  .toast-close:active { background:rgba(255,255,255,0.2); }
+
+  .toast-next-row { margin-bottom:12px; }
+  .toast-next-label { font-size:10px; color:rgba(255,255,255,0.35); font-weight:600; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px; }
+  .toast-next-name  { font-size:20px; font-weight:800; color:white; letter-spacing:-0.3px; line-height:1.2; }
+  .toast-next-ru    { font-size:14px; color:rgba(255,255,255,0.65); font-weight:500; margin-top:3px; }
+  .toast-next-sets  { font-size:13px; color:rgba(255,255,255,0.4); font-weight:500; margin-top:6px; }
+
+  .toast-timer-row { display:flex; align-items:center; gap:12px; }
+  .toast-timer-circle { position:relative; width:56px; height:56px; flex-shrink:0; }
+  .toast-timer-circle svg { transform:rotate(-90deg); }
+  .ttc-bg   { fill:none; stroke:rgba(255,255,255,0.08); stroke-width:5; }
+  .ttc-fill { fill:none; stroke:url(#timerGrad); stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset 1s linear; }
+  .toast-timer-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ttc-sec   { font-size:20px; font-weight:800; color:white; line-height:1; letter-spacing:-0.5px; }
+  .ttc-label { font-size:9px; color:rgba(255,255,255,0.35); font-weight:600; }
+  .toast-timer-right { flex:1; }
+  .toast-timer-text  { font-size:13px; color:rgba(255,255,255,0.6); font-weight:500; line-height:1.4; }
+  .toast-skip-btn { margin-top:8px; width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:9px; color:white; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .toast-skip-btn:active { background:rgba(255,255,255,0.16); }
+  .toast-add-time { margin-top:5px; width:100%; background:none; border:none; color:rgba(255,255,255,0.3); font-family:inherit; font-size:12px; cursor:pointer; padding:3px; }
+  .toast-add-time:active { color:rgba(255,255,255,0.6); }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<!-- FIXED TOP SHELL -->
+<div class="top-shell" id="top-shell">
+  <div class="app-header">
+    <div>
+      <div class="greeting">Привет 👋</div>
+      <div class="title">Твоя <span>тренировка</span></div>
+    </div>
+    <div class="avatar">🍑</div>
+  </div>
+
+  <div class="tab-wrap">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab(0,this)">🍑 Тренировка 1</button>
+      <button class="tab-btn" onclick="switchTab(1,this)">🦵 Тренировка 2</button>
+    </div>
+  </div>
+
+  <!-- PROGRESS HERO (shared, updates per tab) -->
+  <div class="hero-wrap">
+    <div class="hero-card" id="hero-card">
+      <div class="hero-label">Прогресс тренировки</div>
+      <div class="hero-row">
+        <div class="hero-count" id="hero-done">0</div>
+        <div class="hero-of" id="hero-total">из 10 упражнений</div>
+      </div>
+      <div class="hero-bar-bg">
+        <div class="hero-bar-fill" id="hero-bar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCROLLABLE AREA -->
+<div class="scroll-area" id="scroll-area">
+
+  <!-- WORKOUT 1 -->
+  <div class="workout-panel active" id="panel-0">
+    <div class="muscle-row">
+      <div class="muscle-chip"><div class="mdot" style="background:#FF4D6D"></div><span class="mname">Ягодицы</span><span class="mpct">95%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#FF8C42"></div><span class="mname">Квадрицепс</span><span class="mpct">75%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#6C63FF"></div><span class="mname">Спина</span><span class="mpct">55%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#2EC4B6"></div><span class="mname">Руки</span><span class="mpct">40%</span></div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum nr">1</div><div><div class="stitle">Активация ягодиц</div><div class="ssub">Обязательно перед базой</div></div><div class="sbadge">2 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="2" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">2</span></div>
+            <div class="set-tap-reps">15–20 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div></div>
+          <div class="per-leg">на ногу</div>
+        </div>
+        </div>
+        <div class="ex-tip">💡 Лёгкий вес, медленно. Цель — "включить" ягодицу</div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение ноги в сторону</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="2" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">2</span></div>
+            <div class="set-tap-reps">15–20 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+        <div class="ex-tip">💡 Почувствуй боковую часть ягодицы</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum nb">2</div><div><div class="stitle">Главная база</div><div class="ssub">Максимальный рост</div></div><div class="sbadge">3 упр.</div></div>
+      <div class="key-tip">🔥 Главный блок — работай тяжело, полная амплитуда!</div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Barbell Squat</div><div class="exnameru">Присед в Смите</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="4" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">4</span></div>
+            <div class="set-tap-reps">8–10 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Hip Thrust</div><div class="exnameru">Ягодичный мост в Смите</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="4" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">4</span></div>
+            <div class="set-tap-reps">8–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+        <div class="ex-tip">⭐ Главное упражнение для роста ягодиц</div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Leg Press</div><div class="exnameru">Жим ногами</div><div class="ex-tags"><span class="tag tm">📌 Leg Press Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">10–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum ng">3</div><div><div class="stitle">Руки</div><div class="ssub">Спина, плечи, бицепс</div></div><div class="sbadge">3 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Lat Pulldown</div><div class="exnameru">Тяга верхнего блока</div><div class="ex-tags"><span class="tag tm">📌 Lat Pulldown Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">10–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Lateral Raise</div><div class="exnameru">Разводка гантелей в стороны</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">12–15 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Biceps Curl</div><div class="exnameru">Подъём гантелей на бицепс</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">10–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum no">4</div><div><div class="stitle">Финальная добивка</div><div class="ssub">Дожигаем ягодицы</div></div><div class="sbadge">1 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение в сторону — финиш</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="2" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">2</span></div>
+            <div class="set-tap-reps">20 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+        <div class="ex-tip">🔥 Лёгкий вес — цель: сильное жжение в ягодицах</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKOUT 2 -->
+  <div class="workout-panel" id="panel-1">
+    <div class="muscle-row">
+      <div class="muscle-chip"><div class="mdot" style="background:#FF4D6D"></div><span class="mname">Ягодицы</span><span class="mpct">90%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#f368e0"></div><span class="mname">Бицепс бедра</span><span class="mpct">80%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#fdcb6e"></div><span class="mname">Плечи</span><span class="mpct">50%</span></div>
+      <div class="muscle-chip"><div class="mdot" style="background:#a29bfe"></div><span class="mname">Трицепс</span><span class="mpct">35%</span></div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum nr">1</div><div><div class="stitle">Активация</div><div class="ssub">Разбудить ягодицы</div></div><div class="sbadge">1 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="2" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">2</span></div>
+            <div class="set-tap-reps">15–20 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div></div>
+          <div class="per-leg">на ногу</div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum nb">2</div><div><div class="stitle">Главная сила</div><div class="ssub">Задняя цепь</div></div><div class="sbadge">2 упр.</div></div>
+      <div class="key-tip">💡 Румынская тяга — ключевое для задней поверхности и формы снизу</div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Romanian Deadlift</div><div class="exnameru">Румынская тяга</div><div class="ex-tags"><span class="tag tf">🏋️ Barbell / Dumbbells</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="4" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">4</span></div>
+            <div class="set-tap-reps">8–10 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Bulgarian Split Squat</div><div class="exnameru">Болгарские выпады</div><div class="ex-tags"><span class="tag tm">📌 Smith Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">8–10 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          <div class="per-leg">на ногу</div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum nr">3</div><div><div class="stitle">Форма ягодиц</div><div class="ssub">Объём и округлость</div></div><div class="sbadge">2 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Hip Abduction</div><div class="exnameru">Отведение в сторону</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">12–15 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Glute Kickback</div><div class="exnameru">Отведение ноги назад</div><div class="ex-tags"><span class="tag tm">📌 Cable Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">12–15 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum ng">4</div><div><div class="stitle">Руки</div><div class="ssub">Спина, плечи, трицепс</div></div><div class="sbadge">3 упр.</div></div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Seated Row</div><div class="exnameru">Горизонтальная тяга</div><div class="ex-tags"><span class="tag tm">📌 Seated Row Machine</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">10–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Shoulder Press</div><div class="exnameru">Жим гантелей вверх</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">8–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Triceps Extension</div><div class="exnameru">Разгибание на трицепс</div><div class="ex-tags"><span class="tag tf">🏋️ Dumbbells</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="3" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">3</span></div>
+            <div class="set-tap-reps">10–12 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sh"><div class="snum no">5</div><div><div class="stitle">Финал — важно!</div><div class="ssub">Не пропускай</div></div><div class="sbadge">1 упр.</div></div>
+      <div class="key-tip">⚡ Финальный мост без веса — максимально "дожигает" мышцы!</div>
+      <div class="ex-card">
+        <div class="ex-top">
+          <div class="ex-left"><div class="exname">Glute Bridge</div><div class="exnameru">Ягодичный мост на полу</div><div class="ex-tags"><span class="tag tb">🤸 Bodyweight</span></div></div>
+          <div class="sets-box">
+          <button class="set-tap-btn" onclick="addSet(event,this)" data-sets="2" data-done="0">
+            <div class="set-tap-label">Подход</div>
+            <div class="set-tap-nums"><span class="cur-sets">0</span><span class="sep">/</span><span class="tot-sets">2</span></div>
+            <div class="set-tap-reps">20–25 повт.</div>
+          </button>
+          <div class="set-dots"><div class="set-dot"></div><div class="set-dot"></div></div>
+          
+        </div>
+        </div>
+        <div class="ex-tip">🔥 Без веса, чувствуй каждое повторение</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<div class="bottom-nav">
+  <div class="nav-item active"><div class="nav-icon">🏋️</div><div class="nav-label">Тренировка</div></div>
+  <div class="nav-item"><div class="nav-icon">📊</div><div class="nav-label">Прогресс</div></div>
+  <div class="nav-item"><div class="nav-icon">💧</div><div class="nav-label">Питание</div></div>
+  <div class="nav-item"><div class="nav-icon">👤</div><div class="nav-label">Профиль</div></div>
+</div>
+
+<script>
+  // Lock height once to prevent Safari toolbar bounce
+  (function() {
+    var h = window.innerHeight;
+    document.body.style.height = h + 'px';
+    document.body.style.maxHeight = h + 'px';
+  })();
+
+  const SMALL_THRESHOLD = 60;
+  document.getElementById('scroll-area').addEventListener('scroll', function() {
+    document.getElementById('hero-card').classList.toggle('small', this.scrollTop > SMALL_THRESHOLD);
+  }, { passive: true });
+
+  function switchTab(idx, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.workout-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + idx).classList.add('active');
+    document.getElementById('scroll-area').scrollTop = 0;
+    document.getElementById('hero-card').classList.remove('small');
+    refreshHero();
+  }
+
+  // ── SET COUNTER ──
+  function addSet(e, btn) {
+    e.stopPropagation();
+    initAudio(); // unlock AudioContext on this user gesture
+    const maxSets = parseInt(btn.dataset.sets);
+    let done = parseInt(btn.dataset.done);
+    if (done >= maxSets) return;
+
+    done++;
+    btn.dataset.done = done;
+    btn.querySelector('.cur-sets').textContent = done;
+
+    // Fill dots
+    const dots = btn.closest('.sets-box').querySelectorAll('.set-dot');
+    dots.forEach((d, i) => d.classList.toggle('filled', i < done));
+
+    const card = btn.closest('.ex-card');
+    const exName = card.querySelector('.exname').textContent;
+
+    if (done >= maxSets) {
+      // Last set — mark done, show toast + scroll to next
+      card.classList.add('done');
+      btn.style.transition = 'transform 0.15s';
+      btn.style.transform = 'scale(1.08)';
+      setTimeout(() => btn.style.transform = '', 200);
+      showNextToast(card, exName);
+    } else {
+      // Not last set — show rest timer
+      startTimer(exName, done, maxSets);
+    }
+    refreshHero();
+  }
+
+  // ── REST TIMER ──
+  const REST_DURATION = 60; // seconds
+  let timerInterval = null;
+  let timerRemaining = 0;
+  const CIRCUMFERENCE = 2 * Math.PI * 80; // r=80 → ~502.65
+
+  function startTimer(exName, doneSets, totalSets) {
+    clearInterval(timerInterval);
+    timerRemaining = REST_DURATION;
+
+    document.getElementById('timer-exname').textContent =
+      exName + ' — подход ' + doneSets + ' из ' + totalSets + ' выполнен';
+    document.getElementById('timer-overlay').classList.add('visible');
+
+    updateTimerDisplay();
+
+    timerInterval = setInterval(() => {
+      timerRemaining--;
+      if (timerRemaining <= 0) {
+        timerRemaining = 0;
+        updateTimerDisplay();
+        clearInterval(timerInterval);
+        // Auto-close after brief pause
+        setTimeout(skipTimer, 600);
+        // Vibrate if supported
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      } else {
+        updateTimerDisplay();
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    document.getElementById('timer-num').textContent = timerRemaining;
+    const offset = CIRCUMFERENCE * (1 - timerRemaining / REST_DURATION);
+    document.getElementById('timer-arc').style.strokeDashoffset = offset;
+  }
+
+  function skipTimer() {
+    clearInterval(timerInterval);
+    document.getElementById('timer-overlay').classList.remove('visible');
+  }
+
+  function addTimerTime() {
+    timerRemaining += 30;
+    updateTimerDisplay();
+  }
+
+  // ── AUDIO ──
+  let audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // iOS suspends context — resume on every user tap
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playBell(freq, duration, volume) {
+    try {
+      const ctx = initAudio();
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, ctx.currentTime + duration);
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    } catch(e) { console.log('audio error', e); }
+  }
+
+  function playTick() { playBell(440, 0.35, 0.3); }
+  function playDone()  {
+    playBell(523, 0.5, 0.35);
+    setTimeout(() => playBell(659, 0.7, 0.35), 280);
+  }
+
+  // ── NEXT EXERCISE TOAST WITH TIMER ──
+  let toastInterval = null;
+  let toastRemaining = 0;
+  const TOAST_CIRC = 2 * Math.PI * 24; // r=24 → 150.8
+
+  function showNextToast(doneCard, doneName) {
+    const panel = doneCard.closest('.workout-panel');
+    const allCards = Array.from(panel.querySelectorAll('.ex-card'));
+    const idx = allCards.indexOf(doneCard);
+    const nextCard = allCards[idx + 1];
+
+    // Fill done exercise info
+    document.getElementById('toast-done-name').textContent = doneName;
+    const doneRu = doneCard.querySelector('.exnameru');
+    document.getElementById('toast-done-ru').textContent = doneRu ? doneRu.textContent : '';
+
+    if (nextCard) {
+      const nextName = nextCard.querySelector('.exname').textContent;
+      const nextRu   = nextCard.querySelector('.exnameru');
+      const nextSets = nextCard.querySelector('.set-tap-btn').dataset.sets;
+      const nextReps = nextCard.querySelector('.set-tap-reps').textContent;
+      document.getElementById('toast-next-name').textContent = nextName;
+      document.getElementById('toast-next-ru').textContent   = nextRu ? nextRu.textContent : '';
+      document.getElementById('toast-next-sets').textContent = nextSets + ' подхода · ' + nextReps;
+      document.getElementById('toast-next-row').style.display = '';
+
+      // Scroll to next card — use getBoundingClientRect for accuracy
+      setTimeout(() => {
+        const scrollArea = document.getElementById('scroll-area');
+        const areaRect  = scrollArea.getBoundingClientRect();
+        const cardRect  = nextCard.getBoundingClientRect();
+        const offset    = scrollArea.scrollTop + (cardRect.top - areaRect.top) - 16;
+        scrollArea.scrollTo({ top: offset, behavior: 'smooth' });
+      }, 500);
+    } else {
+      document.getElementById('toast-next-name').textContent = '🎉 Тренировка завершена!';
+      document.getElementById('toast-next-ru').textContent = '';
+      document.getElementById('toast-next-sets').textContent = '';
+    }
+
+    // Start toast timer
+    clearInterval(toastInterval);
+    toastRemaining = 60;
+    updateToastTimer();
+    toastInterval = setInterval(() => {
+      toastRemaining--;
+      if (toastRemaining <= 0) {
+        toastRemaining = 0;
+        updateToastTimer();
+        clearInterval(toastInterval);
+        playDone();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        setTimeout(closeToast, 800);
+      } else {
+        if (toastRemaining <= 3) playTick();
+        updateToastTimer();
+      }
+    }, 1000);
+
+    document.getElementById('next-toast').classList.add('show');
+  }
+
+  function updateToastTimer() {
+    document.getElementById('toast-sec').textContent = toastRemaining;
+    const offset = TOAST_CIRC * (1 - toastRemaining / 60);
+    document.getElementById('toast-arc').style.strokeDashoffset = offset;
+  }
+
+  function closeToast() {
+    initAudio();
+    clearInterval(toastInterval);
+    document.getElementById('next-toast').classList.remove('show');
+  }
+
+  function toastAddTime() {
+    initAudio();
+    toastRemaining += 30;
+    updateToastTimer();
+  }
+
+  function refreshHero() {
+    const panel = document.querySelector('.workout-panel.active');
+    if (!panel) return;
+    const done  = panel.querySelectorAll('.ex-card.done').length;
+    const total = panel.querySelectorAll('.ex-card').length;
+    document.getElementById('hero-done').textContent = done;
+    document.getElementById('hero-total').textContent = 'из ' + total + ' упражнений';
+    document.getElementById('hero-bar').style.width = (total ? Math.round(done/total*100) : 0) + '%';
+  }
+</script>
+
+<!-- REST TIMER OVERLAY -->
+<div class="timer-overlay" id="timer-overlay">
+  <svg width="0" height="0">
+    <defs>
+      <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#2EC4B6"/>
+        <stop offset="100%" style="stop-color:#44e08a"/>
+      </linearGradient>
+    </defs>
+  </svg>
+  <div class="timer-label">Отдых</div>
+  <div class="timer-exercise" id="timer-exname"></div>
+  <div class="timer-circle">
+    <svg width="180" height="180" viewBox="0 0 180 180">
+      <circle class="timer-circle-bg" cx="90" cy="90" r="80"/>
+      <circle class="timer-circle-fill" id="timer-arc" cx="90" cy="90" r="80"
+        stroke-dasharray="502" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-seconds">
+      <div class="timer-num" id="timer-num">60</div>
+      <div class="timer-sec-label">секунд</div>
+    </div>
+  </div>
+  <button class="timer-skip" onclick="skipTimer()">Готова ✓</button>
+  <div class="timer-add" onclick="addTimerTime()">+ 30 секунд</div>
+</div>
+
+<!-- NEXT EXERCISE TOAST -->
+<div class="toast" id="next-toast">
+  <div class="toast-top">
+    <div class="toast-left">
+      <div class="toast-check">✓</div>
+      <div>
+        <div class="toast-done-name" id="toast-done-name"></div>
+        <div class="toast-done-ru"   id="toast-done-ru"></div>
+      </div>
+    </div>
+    <button class="toast-close" onclick="closeToast()">×</button>
+  </div>
+  <div class="toast-next-row" id="toast-next-row">
+    <div class="toast-next-label">Следующее упражнение</div>
+    <div class="toast-next-name" id="toast-next-name"></div>
+    <div class="toast-next-ru"   id="toast-next-ru"></div>
+    <div class="toast-next-sets" id="toast-next-sets"></div>
+  </div>
+  <div class="toast-timer-row">
+    <div class="toast-timer-circle">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle class="ttc-bg"   cx="28" cy="28" r="24"/>
+        <circle class="ttc-fill" id="toast-arc" cx="28" cy="28" r="24"
+          stroke-dasharray="150.8" stroke-dashoffset="0"/>
+      </svg>
+      <div class="toast-timer-num">
+        <div class="ttc-sec"   id="toast-sec">60</div>
+        <div class="ttc-label">сек</div>
+      </div>
+    </div>
+    <div class="toast-timer-right">
+      <div class="toast-timer-text">Отдохни перед следующим упражнением</div>
+      <button class="toast-skip-btn" onclick="closeToast()">Готова, вперёд ✓</button>
+      <button class="toast-add-time" onclick="toastAddTime()">+ 30 секунд</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
