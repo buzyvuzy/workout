@@ -663,6 +663,7 @@
   // ── SET COUNTER ──
   function addSet(e, btn) {
     e.stopPropagation();
+    unlockAudio(); // create/resume context synchronously on this tap
     const maxSets = parseInt(btn.dataset.sets);
     let done = parseInt(btn.dataset.done);
     if (done >= maxSets) return;
@@ -740,24 +741,32 @@
     updateTimerDisplay();
   }
 
-  // ── AUDIO — iOS Safari requires fresh context created synchronously on tap ──
+  // ── AUDIO ──
+  // iOS requires AudioContext to be created synchronously on a user gesture.
+  // We create it on the "Подход" tap and reuse it in setInterval.
+  let _ctx = null;
+
+  function unlockAudio() {
+    // Called synchronously on every tap
+    if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_ctx.state === 'suspended') _ctx.resume();
+  }
+
   function playBell(freq, duration, volume) {
+    if (!_ctx) return;
     try {
-      const ctx  = new (window.AudioContext || window.webkitAudioContext)();
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const osc  = _ctx.createOscillator();
+      const gain = _ctx.createGain();
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(_ctx.destination);
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, ctx.currentTime + duration);
-      gain.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + duration);
-      // close context after sound finishes to free memory
-      osc.onended = () => ctx.close();
+      osc.frequency.setValueAtTime(freq, _ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, _ctx.currentTime + duration);
+      gain.gain.setValueAtTime(0.001, _ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(volume, _ctx.currentTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, _ctx.currentTime + duration);
+      osc.start(_ctx.currentTime);
+      osc.stop(_ctx.currentTime + duration);
     } catch(e) { console.warn('audio:', e); }
   }
 
